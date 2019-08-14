@@ -8,6 +8,8 @@
 using namespace std::string_view_literals;
 namespace py = pybind11;
 
+constexpr auto VERSION = "0.1"sv;
+
 struct Convert {
     // Profile data types to python conversion
     // TODO: pybind11 converts all basic types -> add converters for custom types only
@@ -134,7 +136,9 @@ private:
 };
 
 
-PYBIND11_MODULE(profile_parser, m) {
+PYBIND11_MODULE(pyprofileparser, m) {
+    m.attr("__VERSION__") = py::str(VERSION.data(), VERSION.size());
+
     py::class_<PyProfile> cls(m, "Profile");
     cls.def(py::init<std::string>());
     cls.def("values", &PyProfile::values, "Profile values.");
