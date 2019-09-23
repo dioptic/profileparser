@@ -1,22 +1,19 @@
 cmake_minimum_required(VERSION 3.12)
-
 project(pyprofileparser CXX)
 
-find_package(PythonInterp 3.6 REQUIRED)
-find_package(PythonLibs 3.6 REQUIRED)
-exec_program("${PYTHON_EXECUTABLE}-config" ARGS "--extension-suffix" OUTPUT_VARIABLE PY_EXTSUFFIX)
+# Find Python3 and its development components
+find_package (Python3 COMPONENTS Interpreter Development)
+if(NOT Python3_FOUND)
+  message(FATAL_ERROR "Python3 components not found")
+endif()
 
-add_library(${PROJECT_NAME} SHARED "pyprofileparser.cpp")
+# Determine python extension suffix for this platform
+exec_program(${Python3_EXECUTABLE}
+  ARGS -c "\"import importlib; print(importlib.machinery.EXTENSION_SUFFIXES[0])\""
+  OUTPUT_VARIABLE Python3_EXTSUFFIX)
 
+# Create python extension module
+Python3_add_library(${PROJECT_NAME} MODULE "pyprofileparser.cpp")
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
+set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ${Python3_EXTSUFFIX} OUTPUT_NAME "${PROJECT_NAME}")
 
-target_include_directories(${PROJECT_NAME} PRIVATE ${PYTHON_INCLUDE_DIRS})
-target_link_libraries(${PROJECT_NAME} ${PYTHON_LIBRARIES})
-
-set_target_properties(
-    ${PROJECT_NAME}
-    PROPERTIES
-        PREFIX ""
-        SUFFIX ${PY_EXTSUFFIX}
-        OUTPUT_NAME "${PROJECT_NAME}"
-)
