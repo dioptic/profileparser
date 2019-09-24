@@ -137,7 +137,7 @@ private:
 
 
 PYBIND11_MODULE(pyprofileparser, m) {
-    m.attr("__VERSION__") = py::str(VERSION.data(), VERSION.size());
+    m.attr("__version__") = py::str(VERSION.data(), VERSION.size());
 
     py::class_<PyProfile> cls(m, "Profile");
     cls.def(py::init<std::string>());
