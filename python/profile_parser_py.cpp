@@ -1,3 +1,5 @@
+#include <utility>
+
 #include <Python.h>
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
@@ -140,5 +142,5 @@ PYBIND11_MODULE(profile_parser, m) {
     cls.def("to_json_ast", &PyProfile::to_json_ast, "Profile JSON representation.",
             py::arg("eval_expressions") = true);
 
-    m.def("parse", [](std::string src) { return PyProfile(src); });
+    m.def("parse", [](std::string src) { return PyProfile(std::move(src)); });
 }
