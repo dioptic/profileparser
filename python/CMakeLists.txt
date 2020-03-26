@@ -25,7 +25,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 
 # Compile warnings
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-    target_compile_options(${PROJECT_NAME} PRIVATE -Werror -Wall -Wextra -Wpedantic)
+    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-    target_compile_options(${PROJECT_NAME} PRIVATE /WX)
+    target_compile_options(${PROJECT_NAME} PRIVATE)
 endif()
