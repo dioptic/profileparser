@@ -9,7 +9,7 @@ endif()
 
 # Determine python extension suffix for this platform
 exec_program(${Python3_EXECUTABLE}
-  ARGS -c "\"import importlib; print(importlib.machinery.EXTENSION_SUFFIXES[0])\""
+  ARGS -c "\"import importlib.machinery; print(importlib.machinery.EXTENSION_SUFFIXES[0])\""
   OUTPUT_VARIABLE Python3_EXTSUFFIX
 )
 
