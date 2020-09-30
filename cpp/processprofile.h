@@ -827,6 +827,39 @@ protected:
 };
 
 
+// Utility functions
+
+/**
+ * @brief visit_values Visit profile value objects.
+ * @param profile Profile object.
+ * @param visitor Value object visitor.
+ */
+template <typename Visitor>
+inline void visit_values(ObjectPtr& profile, Visitor&& visitor)
+{
+    const auto isValue = [](const ObjectPtr& obj) -> bool { return obj->classname == "Value"; };
+    for (auto& obj : profile->children) {
+        if (!isValue(obj)) { continue; }
+        visitor(obj);
+    }
+}
+
+/**
+ * @brief visit_values Visit profile value objects.
+ * @param profile Profile object.
+ * @param visitor Value object visitor.
+ */
+template <typename Visitor>
+inline void visit_values(const ObjectPtr& profile, Visitor&& visitor)
+{
+    const auto isValue = [](const ObjectPtr& obj) -> bool { return obj->classname == "Value"; };
+    for (const auto& obj : profile->children) {
+        if (!isValue(obj)) { continue; }
+        visitor(obj);
+    }
+}
+
+
 // External interface
 
 /**
@@ -857,6 +890,19 @@ std::tuple<ObjectPtr, IdCollection> parse(const std::string_view& src)
 std::tuple<ObjectPtr, IdCollection> parse(const char* src)
 {
     return parse(std::string_view(src, strlen(src)));
+}
+
+/**
+ * @brief to_profile_source Serialize profile object to profile source.
+ * @param obj Profile object to serialize.
+ * @return Profile source serialization.
+ */
+std::string to_profile_source(const ObjectPtr& obj)
+{
+    std::stringstream out;
+    DefaultPrinter printer { out };
+    printer << obj;
+    return out.str();
 }
 
 /**
