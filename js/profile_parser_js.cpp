@@ -207,7 +207,7 @@ std::vector<ValueField> fields_from_profile(const Profile::ObjectPtr& profile)
 
 val source_to_fields(const std::string& source)
 try {
-    const auto [profile, ids] = Profile::parse(source.data());
+    const auto [profile, ids] = Profile::parse(source);
     return val::array(fields_from_profile(profile));
 } catch(...) {
     return val::global("Error").new_(val("Failed parsing profile"));
@@ -224,7 +224,7 @@ void update_profile_values(Profile::ObjectPtr& profile, const val& updateDict)
 
 val source_to_json_ast(const std::string& source, const bool eval_expressions)
 try {
-    const auto json = Profile::to_json_ast(source.data(), eval_expressions);
+    const auto json = Profile::to_json_ast(source, eval_expressions);
     return val(json);
 } catch (const std::exception& e) {
     return val::global("Error").new_(val(std::string(e.what())));
@@ -232,7 +232,7 @@ try {
 
 val source_with_updates(const std::string& source, const val& updateDict)
 try {
-    auto [profile, ids] = Profile::parse(source.data());
+    auto [profile, ids] = Profile::parse(source);
     update_profile_values(profile, updateDict);
     return val(Profile::to_profile_source(profile));
 } catch (const std::exception& e) {

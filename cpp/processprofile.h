@@ -44,7 +44,7 @@ Float       <- FloatExp / FloatDot
 MulOp       <- [*/]
 SumOp       <- [-+]
 Operand     <- Reference / Float / Integer
-Factor      <- Operand / Sign? S? '(' S? Sum S? ')'
+Factor      <- Sign? S? Operand / Sign? S? '(' S? Sum S? ')'
 Product     <- Factor  (S? MulOp S? Factor )*
 Sum         <- Product (S? SumOp S? Product)*
 Expr        <- Sum
@@ -218,97 +218,91 @@ inline peg::parser create_parser()
         throw std::runtime_error("Failed to load profile grammar");
     }
 
-    parser["Identifier"] = [](const peg::SemanticValues& sv) -> std::string {
-        return {sv.c_str(), sv.length()};
+    parser["Identifier"] = [](const peg::SemanticValues& vs) -> std::string {
+        return vs.token_to_string();
     };
 
-    parser["Reference"] = [](peg::SemanticValues& sv) -> Reference {
-        return Reference { std::move(std::any_cast<std::string&>(sv[0])) };
+    parser["Reference"] = [](peg::SemanticValues& vs) -> Reference {
+        return Reference { std::move(std::any_cast<std::string&>(vs[0])) };
     };
 
-    parser["Boolean"] = [](const peg::SemanticValues& sv) -> bool {
+    parser["Boolean"] = [](const peg::SemanticValues& vs) -> bool {
         // 'false' / 'true'
-        return sv.choice() != 0;
+        return vs.choice() != 0;
     };
 
-    parser["String"] = [](const peg::SemanticValues& sv) -> std::string {
-        return {sv.c_str() + 1, sv.length() - 2};
+    parser["String"] = [](const peg::SemanticValues& vs) -> std::string {
+        const std::string_view sv = vs.sv();
+        return { sv.data() + 1, sv.size() - 2 };
     };
 
-    parser["Integer"] = [](const peg::SemanticValues& sv) -> Integer {
-        Integer result;
-        std::istringstream istr(sv.str());
-        istr >> result;
-        return result;
+    parser["Integer"] = [](const peg::SemanticValues& vs) -> Integer {
+        return vs.token_to_number<Integer>();
     };
 
-    parser["Float"] = [](const peg::SemanticValues& sv) -> Float {
-        // Warning: Locale setting affects atof -> parsing with string stream
-        Float result;
-        std::istringstream istr(sv.str());
-        istr >> result;
-        return result;
+    parser["Float"] = [](const peg::SemanticValues& vs) -> Float {
+        return vs.token_to_number<Float>();
     };
 
-    parser["List"] = [](peg::SemanticValues& sv) -> ListPtr {
+    parser["List"] = [](peg::SemanticValues& vs) -> ListPtr {
         // Zero or more Value items
         ListPtr list = std::make_shared<List>();
-        list->reserve(sv.size());
-        for (auto& item: sv) {
-            auto& v = std::any_cast<ValuePtr&>(item);
-            list->emplace_back(std::move(*v));
+        list->reserve(vs.size());
+        for (auto& v : vs) {
+            auto& item = std::any_cast<ValuePtr&>(v);
+            list->emplace_back(std::move(*item));
         }
         return list;
     };
 
-    parser["KeyVal"] = [](peg::SemanticValues& sv) -> KeyVal {
+    parser["KeyVal"] = [](peg::SemanticValues& vs) -> KeyVal {
         // (Identifier / String) S? ':' S? Value
-        auto& id = std::any_cast<std::string&>(sv[0]);
-        auto& value = std::any_cast<ValuePtr&>(sv[1]);
+        auto& id = std::any_cast<std::string&>(vs[0]);
+        auto& value = std::any_cast<ValuePtr&>(vs[1]);
         return { std::move(id), std::move(*value) };
     };
 
-    parser["Dict"] = [](peg::SemanticValues& sv) -> DictPtr {
+    parser["Dict"] = [](peg::SemanticValues& vs) -> DictPtr {
         // Zero or more KeyVal items
         DictPtr dct = std::make_shared<Dict>();
-        dct->reserve(sv.size());
-        for (auto& item: sv) {
-            auto& kv = std::any_cast<KeyVal&>(item);
-            dct->emplace_back(std::move(kv));
+        dct->reserve(vs.size());
+        for (auto& kv : vs) {
+            auto& item = std::any_cast<KeyVal&>(kv);
+            dct->emplace_back(std::move(item));
         }
         return dct;
     };
 
-    parser["Value"] = [](peg::SemanticValues& sv) -> ValuePtr {
+    parser["Value"] = [](peg::SemanticValues& vs) -> ValuePtr {
         // Object / Dict / List / String / Boolean / Expr
-        switch (sv.choice()) {
+        switch (vs.choice()) {
         case 0:
-            return valuePtrFrom(std::move(std::any_cast<ObjectPtr&>(sv[0])));
+            return valuePtrFrom(std::move(std::any_cast<ObjectPtr&>(vs[0])));
         case 1:
-            return valuePtrFrom(std::move(std::any_cast<DictPtr&>(sv[0])));
+            return valuePtrFrom(std::move(std::any_cast<DictPtr&>(vs[0])));
         case 2:
-            return valuePtrFrom(std::move(std::any_cast<ListPtr&>(sv[0])));
+            return valuePtrFrom(std::move(std::any_cast<ListPtr&>(vs[0])));
         case 3:
-            return valuePtrFrom(std::move(std::any_cast<String&>(sv[0])));
+            return valuePtrFrom(std::move(std::any_cast<String&>(vs[0])));
         case 4:
-            return valuePtrFrom(std::any_cast<Boolean>(sv[0]));
+            return valuePtrFrom(std::any_cast<Boolean>(vs[0]));
         default:
-            return std::move(std::any_cast<ValuePtr&>(sv[0]));
+            return std::move(std::any_cast<ValuePtr&>(vs[0]));
         }
     };
 
-    constexpr auto parse_op = [](const peg::SemanticValues& sv) {
-        return static_cast<Expression::Op>(*sv.c_str());
+    constexpr auto parse_op = [](const peg::SemanticValues& vs) {
+        return static_cast<Expression::Op>(vs.sv().front());
     };
     parser["Sign"] = parse_op;
     parser["MulOp"] = parse_op;
     parser["SumOp"] = parse_op;
 
-    parser["Operand"] = [](peg::SemanticValues& sv, std::any& ctx) -> Expression {
+    parser["Operand"] = [](peg::SemanticValues& vs, std::any& ctx) -> Expression {
         // Reference / Float / Integer
-        switch (sv.choice()) {
+        switch (vs.choice()) {
         case 0: {
-            auto& reference = std::any_cast<Reference&>(sv[0]);
+            auto& reference = std::any_cast<Reference&>(vs[0]);
             // Substitute reference with constant if defined by context
             if (ctx.has_value()) {
                 const auto& subs = *std::any_cast<ValueSubstitutions*>(ctx);
@@ -327,19 +321,18 @@ inline peg::parser create_parser()
             return Expression::fromReference(std::move(reference));
         }
         case 1:
-            return Expression::fromConstant(std::any_cast<Float>(sv[0]));
+            return Expression::fromConstant(std::any_cast<Float>(vs[0]));
         default:
-            return Expression::fromConstant(std::any_cast<Integer>(sv[0]));
+            return Expression::fromConstant(std::any_cast<Integer>(vs[0]));
         }
     };
 
-    parser["Factor"] = [](peg::SemanticValues& sv) -> Expression {
-        // Operand / Sign? S? '(' S? Expr S? ')'
-        const auto with_sign = (sv.size() == 2);
-        const auto expr_idx = with_sign ? 1 : 0;
-        const auto sign = with_sign ? std::any_cast<Expression::Op>(sv[0]) : Expression::Op::Plus;
-        auto& result = std::any_cast<Expression&>(sv[expr_idx]);
-        // Multiply expression by -1 if sign is negative
+    parser["Factor"] = [](peg::SemanticValues& vs) -> Expression {
+        // Sign? S? Operand / Sign? S? '(' S? Expr S? ')'
+        const auto with_sign = (vs.size() == 2);
+        const auto sign = with_sign ? std::any_cast<Expression::Op>(vs[0]) : Expression::Op::Plus;
+        Expression& result = std::any_cast<Expression&>(vs[with_sign ? 1 : 0]);
+        // Multiply expression result by -1 if sign is negative
         if (sign == Expression::Op::Minus) {
             auto minus_one = Expression::fromConstant(-1l);
             result.apply(Expression::Op::Mul, minus_one);
@@ -347,20 +340,20 @@ inline peg::parser create_parser()
         return std::move(result);
     };
 
-    constexpr auto reduce_expr = [](peg::SemanticValues& sv) -> Expression {
+    constexpr auto reduce_expr = [](peg::SemanticValues& vs) -> Expression {
         // Operand (Op Operand)*
-        auto& result = std::any_cast<Expression&>(sv[0]);
-        for (auto i = 1u; i < sv.size(); i += 2) {
-            result.apply(std::any_cast<Expression::Op>(sv[i]), std::any_cast<Expression&>(sv[i+1]));
+        auto& result = std::any_cast<Expression&>(vs[0]);
+        for (auto i = 1u; i < vs.size(); i += 2) {
+            result.apply(std::any_cast<Expression::Op>(vs[i]), std::any_cast<Expression&>(vs[i+1]));
         }
         return std::move(result);
     };
     parser["Product"] = reduce_expr;
     parser["Sum"] = reduce_expr;
 
-    parser["Expr"] = [](peg::SemanticValues& sv) -> ValuePtr {
+    parser["Expr"] = [](peg::SemanticValues& vs) -> ValuePtr {
         struct Visitor {
-            peg::SemanticValues& sv;
+            peg::SemanticValues& vs;
 
             ValuePtr operator()(Expression::Constant& c) {
                 return std::visit([](const auto v) -> ValuePtr { return valuePtrFrom(v); }, c);
@@ -369,55 +362,55 @@ inline peg::parser create_parser()
                 return valuePtrFrom(std::move(ref));
             }
             ValuePtr operator()(RawExpression& expr) {
-                expr.str = sv.token();  // Remember full expression
+                expr.str = vs.token();  // Remember full expression
                 return valuePtrFrom(std::move(expr));
             }
         };
-        return std::visit(Visitor { sv }, std::any_cast<Expression&>(sv[0]).value);
+        return std::visit(Visitor { vs }, std::any_cast<Expression&>(vs[0]).value);
     };
 
-    parser["AttrValue"] = [](peg::SemanticValues& sv) -> Attribute {
-        const auto pos = static_cast<size_t>(sv.c_str() - sv.ss);
-        const std::pair<size_t, size_t> src_loc {pos, sv.length()};
+    parser["AttrValue"] = [](peg::SemanticValues& vs) -> Attribute {
+        const auto pos = static_cast<size_t>(vs.sv().data() - vs.ss);
+        const std::pair<size_t, size_t> src_loc {pos, vs.sv().length()};
         return Attribute {
-            {}, std::move(std::any_cast<ValuePtr&>(sv[0])), src_loc
+            {}, std::move(std::any_cast<ValuePtr&>(vs[0])), src_loc
         };
     };
 
-    parser["Attribute"] = [](peg::SemanticValues& sv) -> Attribute {
+    parser["Attribute"] = [](peg::SemanticValues& vs) -> Attribute {
         // Identifier ':' S? AttrValue
-        auto& attribute = std::any_cast<Attribute&>(sv[1]);
-        attribute.name = std::move(std::any_cast<std::string&>(sv[0]));
+        auto& attribute = std::any_cast<Attribute&>(vs[1]);
+        attribute.name = std::move(std::any_cast<std::string&>(vs[0]));
         return std::move(attribute);
     };
 
-    parser["ObjectItem"] = [](peg::SemanticValues& sv) -> Object::Item {
+    parser["ObjectItem"] = [](peg::SemanticValues& vs) -> Object::Item {
         // Object / Attribute
-        switch (sv.choice()) {
-        case 0: return std::move(std::any_cast<ObjectPtr&>(sv[0]));
-        default: return std::move(std::any_cast<Attribute&>(sv[0]));
+        switch (vs.choice()) {
+        case 0: return std::move(std::any_cast<ObjectPtr&>(vs[0]));
+        default: return std::move(std::any_cast<Attribute&>(vs[0]));
         }
     };
 
-    parser["ClassName"] = [](const peg::SemanticValues& sv) -> std::string {
-        return {sv.c_str(), sv.length()};
+    parser["ClassName"] = [](const peg::SemanticValues& vs) -> std::string {
+        return vs.token_to_string();
     };
 
-    parser["ObjectHead"] = [](peg::SemanticValues& sv) -> ObjectPtr {
+    parser["ObjectHead"] = [](peg::SemanticValues& vs) -> ObjectPtr {
         // ClassName (S Identifier)?
         ObjectPtr obj = std::make_shared<Object>();
-        obj->classname = std::move(std::any_cast<std::string&>(sv[0]));
-        if (sv.size() > 1) {
-            obj->id = std::move(std::any_cast<std::string&>(sv[1]));
+        obj->classname = std::move(std::any_cast<std::string&>(vs[0]));
+        if (vs.size() > 1) {
+            obj->id = std::move(std::any_cast<std::string&>(vs[1]));
         }
         return obj;
     };
 
-    parser["Object"] = [](peg::SemanticValues& sv) -> ObjectPtr {
+    parser["Object"] = [](peg::SemanticValues& vs) -> ObjectPtr {
         // ObjectHead S? '{' S? ObjectItem? (S ObjectItem)* S? '}'
-        auto& obj = std::any_cast<ObjectPtr&>(sv[0]);
-        for (size_t i = 1; i < sv.size(); ++i) {
-            auto& item = std::any_cast<Object::Item&>(sv[i]);
+        auto& obj = std::any_cast<ObjectPtr&>(vs[0]);
+        for (size_t i = 1; i < vs.size(); ++i) {
+            auto& item = std::any_cast<Object::Item&>(vs[i]);
             if (std::holds_alternative<ObjectPtr>(item)) {
                 obj->children.emplace_back(std::move(std::get<ObjectPtr>(item)));
             } else {
@@ -427,16 +420,16 @@ inline peg::parser create_parser()
         return std::move(obj);
     };
 
-    parser["Document"] = [](peg::SemanticValues& sv) -> ObjectPtr {
-        return std::move(std::any_cast<ObjectPtr&>(sv[0]));
+    parser["Document"] = [](peg::SemanticValues& vs) -> ObjectPtr {
+        return std::move(std::any_cast<ObjectPtr&>(vs[0]));
     };
 
-    parser.enable_packrat_parsing();
+    // parser.enable_packrat_parsing();  // Seems to be broken in JS, heap corruption?
 
     return parser;
 }
 
-const peg::parser& parser_inst()
+const peg::parser& default_parser_instance()
 {
     static const peg::parser parser = create_parser();
     return parser;
@@ -800,8 +793,9 @@ protected:
         if (eval_epressions) {
             // Re-parse expression with variable substitution and emit constant
             ValuePtr value;
-            peg::any ctx { &substitutions };
-            const auto p = parser_inst()["Expr"].parse_and_get_value(expr.str.data(), expr.str.length(), ctx, value);
+            const auto& parser = default_parser_instance();
+            std::any ctx { &substitutions };
+            const auto p = parser["Expr"].parse_and_get_value(expr.str.data(), expr.str.length(), ctx, value);
             (*this) << value;
         } else {
             // Emit raw expression
@@ -871,12 +865,15 @@ std::tuple<ObjectPtr, IdCollection> parse(const std::string_view& src)
 {
     // Parse source
     ObjectPtr profile;
-    const auto result = parser_inst()["Document"].parse_and_get_value(src.data(), src.size(), profile);
+    const auto& parser = default_parser_instance();
+    std::stringstream errorstr;
+    const auto logger = [&](size_t line, size_t pos, const std::string& msg) {
+        errorstr << line << ':' << pos << ' ' << msg << '\n';
+    };
+    const auto result = parser["Document"].parse_and_get_value(src.data(), src.size(), profile, nullptr, logger);
     if (!result.ret) {
-        std::stringstream error;
-        const auto line_info = peg::line_info(src.data(), result.error_pos);
-        error << "Parse error, line " << line_info.first << ':' << line_info.second;
-        throw std::runtime_error(error.str());
+        result.error_info.output_log(logger, src.data(), src.size());
+        throw std::runtime_error(errorstr.str());
     }
     // Pass 1: Collecting object ids
     IdCollection ids(profile);
@@ -885,11 +882,6 @@ std::tuple<ObjectPtr, IdCollection> parse(const std::string_view& src)
     verify(profile);
 
     return { profile, std::move(ids) };
-}
-
-std::tuple<ObjectPtr, IdCollection> parse(const char* src)
-{
-    return parse(std::string_view(src, strlen(src)));
 }
 
 /**
