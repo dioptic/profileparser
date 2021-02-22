@@ -1,4 +1,4 @@
-#include "../cpp/processprofile.h"
+#include "../cpp/processprofile.hpp"
 
 #include <string>
 #include <string_view>

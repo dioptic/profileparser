@@ -1,5 +1,4 @@
-#ifndef PROCESSPROFILE_H
-#define PROCESSPROFILE_H
+#pragma once
 
 #include "peglib.h"
 #include <utility>
@@ -925,5 +924,3 @@ std::string to_json_ast(const std::string_view& src, const bool eval_epressions)
 }
 
 }  // namespace Profile
-
-#endif // PROCESSPROFILE_H

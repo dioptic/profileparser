@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.16)
 
 project(ProfileParser)
 
@@ -14,4 +14,3 @@ if (BUILD_JS)
     message(STATUS "Enable javascript module")
     message(FATAL_ERROR "Due to CMake limitations the JS module must be build separately for now")
 endif()
-

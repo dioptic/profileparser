@@ -3,7 +3,7 @@
 #include <Python.h>
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
-#include "../cpp/processprofile.h"
+#include "../cpp/processprofile.hpp"
 
 using namespace std::string_view_literals;
 namespace py = pybind11;
