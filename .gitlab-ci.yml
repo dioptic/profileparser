@@ -1,0 +1,76 @@
+default:  
+  tags: ["argos", "docker"]
+
+stages:
+    - build
+    - deploy
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: always
+    - when: never
+
+build-windows:
+  image: argos-buildenv
+  tags: ["windows"]
+  stage: build
+
+  variables:
+    CIBW_BUILD: cp3{9,10}-win_amd64
+  script:
+    - pip install cibuildwheel
+    - python -m cibuildwheel
+  artifacts:
+    paths:
+      - wheelhouse/*.whl
+
+
+
+deploy-windows:
+  image: argos-buildenv
+  tags: ["windows"]
+  stage: deploy
+  needs: ["build-windows"]
+  script:
+      - python -m pip install twine
+      - $env:TWINE_PASSWORD=${CI_JOB_TOKEN}
+      - $env:TWINE_USERNAME="gitlab-ci-token"
+      - python -m twine upload --skip-existing --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi wheelhouse/*.whl
+
+# This would need to run docker inside docker which is apparently a thing (https://www.docker.com/blog/docker-can-now-run-within-docker/)
+# But the smarter option is probably to define a linux vm-executor...
+#build-linux:
+#  image: argos-python-linux
+#  tags: ["linux"]
+#  stage: build
+
+#  variables:
+#    CIBW_BUILD: cp3{9,10}-manylinux_x86_64
+#  script:
+#    - pip install cibuildwheel
+#    - python -m cibuildwheel
+
+build-linux:
+  image: argos-python-linux
+  tags: ["linux"]
+  stage: build
+
+  variables:
+    CIBW_BUILD: cp3{9,10}-manylinux_x86_64
+  script:
+    - pip wheel --verbose .
+  artifacts:
+    paths:
+      - "*.whl"
+
+deploy-linux:
+  image: argos-python-linux
+  tags: ["linux"]
+  stage: deploy
+  needs: ["build-linux"]
+  script:
+      - python -m pip install twine
+      - export TWINE_PASSWORD=${CI_JOB_TOKEN}
+      - export TWINE_USERNAME="gitlab-ci-token"
+      - python -m twine upload --skip-existing --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi *.whl
