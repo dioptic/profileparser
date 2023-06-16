@@ -52,14 +52,14 @@ struct Convert {
         for (const auto& kv: v) {
             dct[py::str(kv.first)] = to_py(kv.second);
         }
-        return std::move(dct);
+        return dct;
     }
 
     static inline py::object to_py(const Profile::List& v)
     {
         py::list list;
         for (const auto& item: v) { list.append(to_py(item)); }
-        return std::move(list);
+        return list;
     }
 
     static inline py::object to_py(const Profile::Object& v)
@@ -80,7 +80,7 @@ struct Convert {
         for (const Profile::Attribute& a: v.attributes) {
             dct[py::str(a.name)] = to_py(a.data);
         }
-        return std::move(dct);
+        return dct;
     }
 
     static inline py::object to_py(const Profile::RawExpression& expr)
@@ -88,7 +88,7 @@ struct Convert {
         py::dict dct;
         dct["_type_"] = py::str("expression");
         dct["value"] = py::str(expr.str);
-        return std::move(dct);
+        return dct;
     }
 
     static inline py::object to_py(const Profile::Reference& ref)
@@ -96,7 +96,7 @@ struct Convert {
         py::dict dct;
         dct["_type_"] = py::str("reference");
         dct["reference"] = py::str(static_cast<const std::string&>(ref));
-        return std::move(dct);
+        return dct;
     }
 };
 
@@ -136,7 +136,7 @@ private:
 };
 
 
-PYBIND11_MODULE(pyprofileparser, m) {
+PYBIND11_MODULE(profileparser, m) {
     m.attr("__version__") = py::str(VERSION.data(), VERSION.size());
 
     py::class_<PyProfile> cls(m, "Profile");

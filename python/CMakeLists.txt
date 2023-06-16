@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(pyprofileparser CXX)
+project(profileparser CXX)
 
 # Default to Release build type
 if (NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
@@ -11,7 +11,7 @@ include(FetchContent)
 FetchContent_Declare(
   pybind11
   GIT_REPOSITORY https://github.com/pybind/pybind11
-  GIT_TAG        v2.6.2
+  GIT_TAG        v2.10.4
 )
 FetchContent_MakeAvailable(pybind11)
 

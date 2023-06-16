@@ -866,10 +866,10 @@ std::tuple<ObjectPtr, IdCollection> parse(const std::string_view& src)
     ObjectPtr profile;
     const auto& parser = default_parser_instance();
     std::stringstream errorstr;
-    const auto logger = [&](size_t line, size_t pos, const std::string& msg) {
-        errorstr << line << ':' << pos << ' ' << msg << '\n';
+    const auto logger = [&](size_t line, size_t pos, const std::string& msg, const std::string& rule) {
+        errorstr << line << ':' << pos << ' ' << msg << '(' << rule << ')' << '\n';
     };
-    const auto result = parser["Document"].parse_and_get_value(src.data(), src.size(), profile, nullptr, logger);
+    auto result = parser["Document"].parse_and_get_value(src.data(), src.size(), profile, nullptr, logger);
     if (!result.ret) {
         result.error_info.output_log(logger, src.data(), src.size());
         throw std::runtime_error(errorstr.str());
