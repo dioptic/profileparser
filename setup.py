@@ -8,7 +8,7 @@ long_description_content_type="text/markdown"
 
 setup(
     name="dioptic.profileparser",
-    version="0.1",
+    version="0.2",
     author="Peter Würtz",
     author_email="pwuertz@gmail.com",
     url="https://github.com/dioptic/profileparser",

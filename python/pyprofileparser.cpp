@@ -8,7 +8,7 @@
 using namespace std::string_view_literals;
 namespace py = pybind11;
 
-constexpr auto VERSION = "0.1"sv;
+constexpr auto VERSION = "0.2"sv;
 
 struct Convert {
     // Profile data types to python conversion
