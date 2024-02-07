@@ -1,3 +1,4 @@
+import sys
 import pathlib
 from setuptools import setup
 from cmake_build_extension import BuildExtension, CMakeExtension
@@ -8,7 +9,7 @@ long_description_content_type="text/markdown"
 
 setup(
     name="dioptic.profileparser",
-    version="0.2",
+    version="0.2.1",
     author="Peter Würtz",
     author_email="pwuertz@gmail.com",
     url="https://github.com/dioptic/profileparser",
@@ -20,6 +21,10 @@ setup(
         name="dioptic.pyprofileparser",
         source_dir="python",
         install_prefix=".",
+        cmake_configure_options=[
+            f"-DPYTHON_EXECUTABLE={pathlib.Path(sys.executable)}",
+            f"-DPYTHON3_EXECUTABLE={pathlib.Path(sys.executable)}",
+	],
     )],
     cmdclass=dict(build_ext=BuildExtension),
 )
