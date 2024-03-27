@@ -6,6 +6,6 @@ Within the activated emscripten environment, configure and build the module with
 
 ```shell
 mkdir build && cd build
-cmake -DCMAKE_TOOLCHAIN_FILE="${EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake" -DCMAKE_BUILD_TYPE=Release ..
+emcmake cmake -DCMAKE_BUILD_TYPE="Release" ..
 cmake --build .
 ```

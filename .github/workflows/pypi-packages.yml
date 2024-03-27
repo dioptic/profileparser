@@ -16,9 +16,9 @@ jobs:
         run: |
           python -m pip install pip build --upgrade
           python -m build --sdist
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: packages
+          name: packages-src
           path: "dist/*.tar.gz"
 
   build-win64-wheels:
@@ -36,9 +36,9 @@ jobs:
         run: |
           python -m pip install pip build --upgrade
           python -m build --wheel
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: packages
+          name: packages-win-py${{ matrix.python-version }}
           path: "dist/*.whl"
 
   pypi-publish:
@@ -51,8 +51,9 @@ jobs:
     steps:
     - uses: actions/download-artifact@v4
       with:
-        name: packages
         path: dist
+        pattern: packages-*
+        merge-multiple: true
     - name: Test PyPI publish
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
@@ -60,22 +61,3 @@ jobs:
         skip-existing: true
     - name: PyPI publish
       uses: pypa/gh-action-pypi-publish@release/v1
-
-  build-web:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: mymindstorm/setup-emsdk@v14
-        with:
-          version: 3.1.57
-          actions-cache-folder: 'emsdk-cache'
-      - name: Build WASM port
-        run: |
-          cd web
-          mkdir build && cd build
-          emcmake cmake -DCMAKE_BUILD_TYPE="Release" ..
-          cmake --build .
-      - uses: actions/upload-artifact@v3
-        with:
-          name: web
-          path: "web/build/ProfileParserJs.*"

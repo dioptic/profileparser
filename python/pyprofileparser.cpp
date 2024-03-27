@@ -1,150 +1,175 @@
 #include <utility>
 
 #include <Python.h>
-#include "pybind11/pybind11.h"
-#include "pybind11/stl.h"
-#include "../cpp/processprofile.hpp"
+#include <nanobind/nanobind.h>
+#include <nanobind/stl/function.h>
+#include <nanobind/stl/pair.h>
+#include <nanobind/stl/shared_ptr.h>
+#include <nanobind/stl/string.h>
+#include <nanobind/stl/unordered_map.h>
+#include <nanobind/stl/variant.h>
+#include <nanobind/stl/vector.h>
 
+#include <profileparser.hpp>
+#include <profileparser/utils.hpp>
+
+namespace py = nanobind;
+using namespace nanobind::literals;
 using namespace std::string_view_literals;
-namespace py = pybind11;
 
-constexpr auto VERSION = "0.2.1"sv;
+constexpr auto VERSION = "0.3.0"sv;
 
-struct Convert {
-    // Profile data types to python conversion
-    // TODO: pybind11 converts all basic types -> add converters for custom types only
-
-    template<typename T>
-    static inline py::object to_py(const std::shared_ptr<T>& v)
-    {
-        return to_py(*v);
-    }
-
-    template<typename... Ts>
-    static inline py::object to_py(const std::variant<Ts...>& v)
-    {
-        return std::visit([&](const auto& v_) -> py::object { return to_py(v_); }, v);
-    }
-
-    static inline py::object to_py(const Profile::Integer& v)
-    {
-        return py::int_(v);
-    }
-
-    static inline py::object to_py(const Profile::Float& v)
-    {
-        return py::float_(v);
-    }
-
-    static inline py::object to_py(const Profile::Boolean& v)
-    {
-        return py::bool_(v);
-    }
-
-    static inline py::object to_py(const Profile::String& v)
-    {
-        return py::str(v);
-    }
-
-    static inline py::object to_py(const Profile::Dict& v)
-    {
-        py::dict dct;
-        for (const auto& kv: v) {
-            dct[py::str(kv.first)] = to_py(kv.second);
-        }
-        return dct;
-    }
-
-    static inline py::object to_py(const Profile::List& v)
-    {
-        py::list list;
-        for (const auto& item: v) { list.append(to_py(item)); }
-        return list;
-    }
-
-    static inline py::object to_py(const Profile::Object& v)
-    {
-        py::dict dct;
-        dct["_type_"] = py::str("object");
-        dct["_class_"] = py::str(v.classname);
-        if (!v.id.empty()) {
-            dct["_id_"] = py::str(v.id);
-        }
-        if (!v.children.empty()) {
-            py::list children;
-            for (const auto& item: v.children) {
-                children.append(to_py(item));
-            }
-            dct["_children_"] = children;
-        }
-        for (const Profile::Attribute& a: v.attributes) {
-            dct[py::str(a.name)] = to_py(a.data);
-        }
-        return dct;
-    }
-
-    static inline py::object to_py(const Profile::RawExpression& expr)
-    {
-        py::dict dct;
-        dct["_type_"] = py::str("expression");
-        dct["value"] = py::str(expr.str);
-        return dct;
-    }
-
-    static inline py::object to_py(const Profile::Reference& ref)
-    {
-        py::dict dct;
-        dct["_type_"] = py::str("reference");
-        dct["reference"] = py::str(static_cast<const std::string&>(ref));
-        return dct;
-    }
-};
-
-
-class PyProfile {
-public:
-    PyProfile(std::string src)
-        : m_src(std::move(src))
-        , m_profile(Profile::parse(m_src))
+struct PyProfile {
+    PyProfile(std::string source)
+        : m_profile(Profile::parse(std::move(source)))
     { }
 
-    py::object to_ast()
+    Profile::ObjectNodePtr root() 
     {
-        const auto& [profile, ids] = m_profile;
-        return Convert::to_py(profile);
+        return m_profile.root;
     }
 
-    std::string to_json_ast(const bool eval_expressions)
+    using AnySourceInfo = std::variant<
+        Profile::ObjectNodePtr, Profile::ReferenceNodePtr, Profile::NumericExpressionNodePtr,
+        Profile::StringExpressionNodePtr, Profile::ListNodePtr, Profile::DictNodePtr,
+        Profile::SourceInfo
+        >;
+
+    Profile::LineRange line_info(const AnySourceInfo& info)
     {
-        const auto& [profile, ids] = m_profile;
-        return Profile::to_json_ast(profile, eval_expressions);
+        return std::visit([&](const auto& n) -> Profile::LineRange {
+            if constexpr (std::is_same_v<decltype(n), const Profile::SourceInfo&>) {
+                return Profile::get_source_range(m_profile, n);
+            } else {
+                return Profile::get_source_range(m_profile, n->source_info);
+            }
+        }, info);
     }
 
-    py::dict values()
+    std::string to_json_ast(const bool eval_expressions) const
     {
-        const auto& [profile, ids] = m_profile;
+        return Profile::to_json_ast(m_profile, eval_expressions);
+    }
+
+    std::string to_source() const
+    {
+        return Profile::to_profile_source(m_profile);
+    }
+
+    using AnySimpleValue = std::variant<int, double, std::string, bool>;
+
+    std::string to_updated_source(const std::unordered_map<std::string, AnySimpleValue>& anyValues) const
+    {
+        std::unordered_map<std::string, Profile::Value> values;
+        for (const auto& [id, value] : anyValues) {
+            values.emplace(id, std::visit([](const auto& v) -> Profile::Value { return v; }, value));
+        }
+        return Profile::to_updated_source(m_profile, values);
+    }
+
+    py::dict values() const
+    {
         py::dict dct;
-        for (const auto& kv : ids.value_ids) {
-            dct[py::str(kv.first)] = Convert::to_py(kv.second->data);
+        for (const auto& [id, attribute] : m_profile.ids.value_ids) {
+            dct[py::str(id.c_str())] = attribute->value;
         }
         return dct;
+    }
+
+    void validate(Profile::CheckRefCallback is_allowed_ref = Profile::default_ref_callback) const
+    {
+        Profile::validate_profile(m_profile, is_allowed_ref);
     }
 
 private:
-    std::string m_src;
-    std::tuple<Profile::ObjectPtr, Profile::IdCollection> m_profile;
+    Profile::ParsedProfile m_profile;
 };
 
 
-PYBIND11_MODULE(profileparser, m) {
+NB_MODULE(profileparser, m) {
     m.attr("__version__") = py::str(VERSION.data(), VERSION.size());
+    
+    py::class_<Profile::SourceInfo> PySourceInfo(m, "SourceInfo");
+    PySourceInfo.def_ro("offset", &Profile::SourceInfo::offset);
+    PySourceInfo.def_ro("length", &Profile::SourceInfo::length);
+
+    py::class_<Profile::LineInfo> PyLineInfo(m, "LineInfo");
+    PyLineInfo.def_ro("line", &Profile::LineInfo::line);
+    PyLineInfo.def_ro("column", &Profile::LineInfo::column);
+
+    py::class_<Profile::LineRange> PyLineRange(m, "LineRange");
+    PyLineRange.def_ro("begin", &Profile::LineRange::begin);
+    PyLineRange.def_ro("end", &Profile::LineRange::end);
+
+    py::class_<Profile::DocString> PyDocString(m, "DocString");
+    PyDocString.def_ro("source_info", &Profile::DocString::source_info);
+    PyDocString.def_ro("lines", &Profile::DocString::lines);
+
+    py::class_<Profile::ListNode> PyListNode(m, "ListNode");
+    PyListNode.def_ro("source_info", &Profile::ListNode::source_info);
+    PyListNode.def_ro("items", &Profile::ListNode::items);
+
+    py::class_<Profile::KeyVal> PyKeyVal(m, "KeyVal");
+    PyKeyVal.def_ro("key", &Profile::KeyVal::key);
+    PyKeyVal.def_ro("value", &Profile::KeyVal::value);
+
+    py::class_<Profile::DictNode> PyDictNode(m, "DictNode");
+    PyDictNode.def_ro("source_info", &Profile::DictNode::source_info);
+    PyDictNode.def_ro("items", &Profile::DictNode::items);
+
+    py::class_<Profile::NumericExpressionNode> PyNumericExpressionNode(m, "NumericExpressionNode");
+    PyNumericExpressionNode.def_ro("source_info", &Profile::NumericExpressionNode::source_info);
+    PyNumericExpressionNode.def_ro("value", &Profile::NumericExpressionNode::value);
+    PyNumericExpressionNode.def_ro("references", &Profile::NumericExpressionNode::references);
+
+    py::class_<Profile::StringExpressionNode> PyStringExpressionNode(m, "StringExpressionNode");
+    PyStringExpressionNode.def_ro("source_info", &Profile::StringExpressionNode::source_info);
+    PyStringExpressionNode.def_ro("fragments", &Profile::StringExpressionNode::fragments);
+
+    py::class_<Profile::ObjectNode> PyObjectNode(m, "ObjectNode");
+    PyObjectNode.def_ro("source_info", &Profile::ObjectNode::source_info);
+    PyObjectNode.def_ro("docstring", &Profile::ObjectNode::docstring);
+    PyObjectNode.def_ro("classname", &Profile::ObjectNode::classname);
+    PyObjectNode.def_ro("id", &Profile::ObjectNode::id);
+    PyObjectNode.def_ro("children", &Profile::ObjectNode::children);
+    PyObjectNode.def_ro("attributes", &Profile::ObjectNode::attributes);
+
+    py::class_<Profile::AttributeNode> PyAttributeNode(m, "AttributeNode");
+    PyAttributeNode.def_ro("source_info", &Profile::AttributeNode::source_info);
+    PyAttributeNode.def_ro("value_source_info", &Profile::AttributeNode::value_source_info);
+    PyAttributeNode.def_ro("name", &Profile::AttributeNode::name);
+    PyAttributeNode.def_ro("value", &Profile::AttributeNode::value);
+
+    py::class_<Profile::ReferenceNode> PyReferenceNode(m, "ReferenceNode");
+    PyReferenceNode.def_ro("source_info", &Profile::ReferenceNode::source_info);
+    PyReferenceNode.def_ro("reference", &Profile::ReferenceNode::reference);
+
+    py::exception<Profile::ProfileError> PyProfileError(m, "ProfileError");
+    py::class_<Profile::ErrorLine> PyErrorLine(m, "ErrorLine");
+    PyErrorLine.def_ro("where", &Profile::ErrorLine::where);
+    PyErrorLine.def_ro("message", &Profile::ErrorLine::message);
 
     py::class_<PyProfile> cls(m, "Profile");
-    cls.def(py::init<std::string>());
+    cls.def(py::init<const std::string&>(), "source"_a);
     cls.def("values", &PyProfile::values, "Profile values.");
-    cls.def("to_ast", &PyProfile::to_ast, "Profile AST representation.");
-    cls.def("to_json_ast", &PyProfile::to_json_ast, "Profile JSON representation.",
-            py::arg("eval_expressions") = true);
+    cls.def("root", &PyProfile::root, "Profile AST root node.");
+    cls.def("line_info", &PyProfile::line_info, "Get line info for node.", "info"_a);
+    cls.def("to_source", &PyProfile::to_source, "Profile AST source representation.");
+    cls.def("to_json_ast", &PyProfile::to_json_ast, "Profile AST JSON representation.", "eval_expressions"_a = true);
+    cls.def("to_updated_source", &PyProfile::to_updated_source, "Original source with value substitutions.", "values"_a);
 
-    m.def("parse", [](std::string src) { return PyProfile(std::move(src)); });
+    m.def(
+        "parse",
+        [](std::string src) -> PyProfile { return PyProfile(std::move(src)); },
+        "Parse profile source and create AST.",
+        "src"_a
+    );
+
+    m.def(
+        "validate", 
+        [](const PyProfile& profile, const Profile::CheckRefCallback& is_allowed_ref = Profile::default_ref_callback) { profile.validate(is_allowed_ref); },
+        "Validate profile structure.",
+        "profile"_a,
+        "is_allowed_ref"_a.none(false).sig("lambda ref: False") = Profile::default_ref_callback
+    );
 }
