@@ -1,3 +1,24 @@
 [build-system]
-requires = ["setuptools>=40.8.0", "cmake_build_extension", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["scikit-build-core >=0.9", "typing_extensions; python_version < '3.11'"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "dioptic.profileparser"
+version = "0.3.0"
+description = "Parser library for ARGOS declarative profiles"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+    { name = "Peter Würtz", email = "pwuertz@gmail.com" },
+]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+]
+
+[project.urls]
+Homepage = "https://github.com/dioptic/profileparser"
+
+[tool.scikit-build]
+cmake.source-dir = "./python"
+build-dir = "build/{wheel_tag}"
+wheel.py-api = "cp312"

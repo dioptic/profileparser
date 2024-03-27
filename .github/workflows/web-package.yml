@@ -1,0 +1,28 @@
+name: Build WASM/web port
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - v[0-9]+.**
+
+jobs:
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.57
+          actions-cache-folder: 'emsdk-cache'
+      - name: Build WASM port
+        run: |
+          cd web
+          mkdir build && cd build
+          emcmake cmake -DCMAKE_BUILD_TYPE="Release" ..
+          cmake --build .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web
+          path: "web/build/ProfileParserJs.*"

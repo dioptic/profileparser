@@ -8,10 +8,13 @@ endif()
 
 # ProfileParserJs WASM library
 
+add_compile_options("-flto=full")
+
 add_executable(${PROJECT_NAME})
 target_sources(${PROJECT_NAME} PRIVATE
     "profile_parser_js.cpp"
-    "../cpp/processprofile.hpp"
+    "binding_helpers.hpp"
+    "binding_ast.hpp"
     )
 target_compile_options(${PROJECT_NAME} PRIVATE
     -Wall -Wextra -Wpedantic
@@ -24,6 +27,11 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
     )
 
+add_subdirectory("../cpp" "${CMAKE_CURRENT_BINARY_DIR}/cpp")
+target_link_libraries(${PROJECT_NAME} PUBLIC
+    libProfileParser::libProfileParser
+    )
+
 target_link_options(${PROJECT_NAME} PRIVATE
     "-lembind"
     "--no-entry"
@@ -32,7 +40,7 @@ target_link_options(${PROJECT_NAME} PRIVATE
     "-sEXPORT_ES6=1"
     "-sENVIRONMENT=web,worker"
     "-sEXPORT_NAME=\"${PROJECT_NAME}\""
-    "--embind-emit-tsd=${PROJECT_NAME}.d.ts"
+    "--emit-tsd=${PROJECT_NAME}.d.ts"
     "-fwasm-exceptions"
     )
 target_compile_options(${PROJECT_NAME} PRIVATE
