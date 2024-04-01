@@ -1,10 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
 
-# Default to Release build type
-if (NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
-  set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
-endif()
-
 project(ProfileParserJs CXX)
 
 if(NOT DEFINED EMSCRIPTEN)
@@ -16,27 +11,30 @@ endif()
 add_executable(${PROJECT_NAME})
 target_sources(${PROJECT_NAME} PRIVATE
     "profile_parser_js.cpp"
-    "../cpp/processprofile.h"
+    "../cpp/processprofile.hpp"
     )
 target_compile_options(${PROJECT_NAME} PRIVATE
     -Wall -Wextra -Wpedantic
     )
-target_include_directories(${PROJECT_NAME} PRIVATE
-    "${EMSCRIPTEN_ROOT_PATH}/system/include"
-    )
 set_target_properties(${PROJECT_NAME} PROPERTIES
     CXX_STANDARD 20
     CXX_STANDARD_REQUIRED ON
-    SUFFIX ".esm.js"
+    SUFFIX ".mjs"
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
     )
 
 target_link_options(${PROJECT_NAME} PRIVATE
-    "--bind" "SHELL:-s WASM=1" "SHELL:-s MODULARIZE=1" "SHELL:-s EXPORT_ES6=1"
-    "SHELL:-s EXPORT_NAME=\"${PROJECT_NAME}\""
-    "SHELL:-s DISABLE_EXCEPTION_CATCHING=0" "-fexceptions"
+    "-lembind"
+    "--no-entry"
+    "-sWASM=1"
+    "-sMODULARIZE=1"
+    "-sEXPORT_ES6=1"
+    "-sENVIRONMENT=web,worker"
+    "-sEXPORT_NAME=\"${PROJECT_NAME}\""
+    "--embind-emit-tsd=${PROJECT_NAME}.d.ts"
+    "-fwasm-exceptions"
     )
 target_compile_options(${PROJECT_NAME} PRIVATE
-    "SHELL:-s DISABLE_EXCEPTION_CATCHING=0" "-fexceptions"
+    "-fwasm-exceptions"
     )

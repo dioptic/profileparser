@@ -169,6 +169,20 @@ namespace detail {
 }  // namespace Convert
 
 
+namespace {
+static inline val as_error_val(auto&& msg)
+{
+    const auto Error = val::global("Error");
+    return Error.new_(std::forward<decltype(msg)>(msg));
+}
+
+static inline val as_error_val(const std::exception& e)
+{
+    return as_error_val(std::string(e.what()));
+}
+}  // namespace
+
+
 struct ValueField {
     std::string id;
     std::string type;
@@ -185,7 +199,7 @@ struct ValueField {
         };
         for (const Profile::Attribute& attribute: obj->attributes) {
             if (attribute.name == "value") {
-                field.type = std::string { detail::type_of(attribute.data) };
+                field.type = std::string{ detail::type_of(attribute.data) };
                 field.value = detail::to_val(attribute.data);
             } else {
                 field.attrs.set(attribute.name, detail::to_val(attribute.data));
@@ -205,15 +219,19 @@ std::vector<ValueField> fields_from_profile(const Profile::ObjectPtr& profile)
     return fields;
 }
 
-val source_to_fields(const std::string& source)
+EMSCRIPTEN_DECLARE_VAL_TYPE(FieldsOrError);
+
+FieldsOrError source_to_fields(const std::string& source)
 try {
     const auto [profile, ids] = Profile::parse(source);
-    return val::array(fields_from_profile(profile));
+    return FieldsOrError(val::array(fields_from_profile(profile)));
 } catch(...) {
-    return val::global("Error").new_(val("Failed parsing profile"));
+    return FieldsOrError(as_error_val(std::string("Failed parsing profile")));
 }
 
-void update_profile_values(Profile::ObjectPtr& profile, const val& updateDict)
+EMSCRIPTEN_DECLARE_VAL_TYPE(ValuesArg);
+
+void update_profile_values(Profile::ObjectPtr& profile, const ValuesArg& updateDict)
 {
     Profile::visit_values(profile, [&](Profile::ObjectPtr& valueObj) {
         if (!updateDict.hasOwnProperty(valueObj->id.c_str())) { return; }
@@ -222,21 +240,25 @@ void update_profile_values(Profile::ObjectPtr& profile, const val& updateDict)
     });
 }
 
-val source_to_json_ast(const std::string& source, const bool eval_expressions)
+EMSCRIPTEN_DECLARE_VAL_TYPE(AstOrError);
+
+AstOrError source_to_json_ast(const std::string& source, const bool eval_expressions)
 try {
     const auto json = Profile::to_json_ast(source, eval_expressions);
-    return val(json);
+    return AstOrError(val(json));
 } catch (const std::exception& e) {
-    return val::global("Error").new_(val(std::string(e.what())));
+    return AstOrError(as_error_val(e));
 }
 
-val source_with_updates(const std::string& source, const val& updateDict)
+EMSCRIPTEN_DECLARE_VAL_TYPE(SourceOrError);
+
+SourceOrError source_with_updates(const std::string& source, const ValuesArg& updateDict)
 try {
     auto [profile, ids] = Profile::parse(source);
     update_profile_values(profile, updateDict);
-    return val(Profile::to_profile_source(profile));
+    return SourceOrError(val(Profile::to_profile_source(profile)));
 } catch (const std::exception& e) {
-    return val::global("Error").new_(val(std::string(e.what())));
+    return SourceOrError(as_error_val(e));
 }
 
 
@@ -248,6 +270,12 @@ EMSCRIPTEN_BINDINGS(profile_parser_module)
             .field("type", &ValueField::type)
             .field("value", &ValueField::value)
             .field("attrs", &ValueField::attrs);
+
+    register_type<ValuesArg>("{[key: string]: any}");
+    register_type<FieldsOrError>("ValueField[] | Error");
+    register_type<SourceOrError>("string | Error");
+    register_type<AstOrError>("{[key: string]: any} | Error");
+
     // Methods
     emscripten::function("source_to_json_ast", &source_to_json_ast);
     emscripten::function("source_to_fields", &source_to_fields);
