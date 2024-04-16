@@ -60,3 +60,22 @@ jobs:
         skip-existing: true
     - name: PyPI publish
       uses: pypa/gh-action-pypi-publish@release/v1
+
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.57
+          actions-cache-folder: 'emsdk-cache'
+      - name: Build WASM port
+        run: |
+          cd web
+          mkdir build && cd build
+          emcmake cmake -DCMAKE_BUILD_TYPE="Release" ..
+          cmake --build .
+      - uses: actions/upload-artifact@v3
+        with:
+          name: web
+          path: "web/build/ProfileParserJs.*"
