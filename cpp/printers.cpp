@@ -234,14 +234,18 @@ protected:
     JsonAstPrinter& operator<<(const NumericExpressionNode& expr)
     {
         if (eval_expressions) {
-            // Re-parse expression with variable substitution and emit constant
-            (*this) << parseExpression(expr.value, substitutions);
-        } else {
-            // Emit raw expression
-            Collection dict(this, "{"sv, ","sv, "}"sv);
-            dict << std::string {"_type_"} << ": " << std::string{"expression"};
-            dict << std::string {"value"} << ": " << expr.value;
-        }
+            // try to re-parse expression with variable substitution and emit constant
+            auto const_expression = parseExpression(expr.value, substitutions);
+            if (!std::holds_alternative<NumericExpressionNodePtr>(const_expression)) {
+                // successful
+                (*this) << const_expression;
+                return *this;
+            }
+        } 
+        // Emit raw expression
+        Collection dict(this, "{"sv, ","sv, "}"sv);
+        dict << std::string {"_type_"} << ": " << std::string{"expression"};
+        dict << std::string {"value"} << ": " << expr.value;
         return *this;
     }
 
