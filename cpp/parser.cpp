@@ -323,7 +323,7 @@ peg::parser create_parser()
             auto& reference = std::any_cast<ReferenceNodePtr&>(vs[0]);
             // Substitute reference with constant if defined by context
             if (ctx.has_value()) {
-                const auto& subs = *std::any_cast<ValueSubstitutions*>(ctx);
+                const auto& subs = *std::any_cast<const ValueSubstitutions*>(ctx);
                 if (auto it = subs.find(reference->reference); it != subs.end()) {
                     const Value& value = it->second;
                     if (auto v = std::get_if<Float>(&value)) {
