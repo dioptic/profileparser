@@ -169,7 +169,7 @@ inline ProfileError format_error(const std::string_view& message, std::vector<Er
     std::stringstream ss;
     ss << std::move(message);
     for (auto& line : errors) {
-        ss << '\n' << line.where.column << ':' << line.where.column << ' ' << line.message;
+        ss << '\n' << line.where.line << ':' << line.where.column << ' ' << line.message;
     }
     return ProfileError { ss.str(), std::move(errors) };
 }

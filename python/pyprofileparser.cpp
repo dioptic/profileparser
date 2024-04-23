@@ -17,7 +17,7 @@ namespace py = nanobind;
 using namespace nanobind::literals;
 using namespace std::string_view_literals;
 
-constexpr auto VERSION = "0.3.0"sv;
+constexpr auto VERSION = "0.3.1"sv;
 
 struct PyProfile {
     PyProfile(std::string source)
