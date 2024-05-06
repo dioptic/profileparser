@@ -77,10 +77,18 @@ struct Printer
         return self();
     }
 
+    PrinterImpl& operator<<(const String& v)
+    {
+        o << '"' << v << '"';
+        return self();
+    }
+
     PrinterImpl& operator<<(const DocString& v)
     {
-        for(auto& line : v.lines)
-            self() << "# " << line << '\n' << indent;
+        for (auto& line : v.lines) {
+            o << "# " << line;
+            self() << '\n' << indent;
+        }
         return self();
     }
 
@@ -143,7 +151,8 @@ struct Printer
         const std::string start = v.classname + ((v.id.empty()) ? "" : ' ' + v.id) + " {";
         Collection obj(&self(), start, ""sv, "}"sv);
         
-        obj << v.docstring;
+        if(v.docstring.lines.size())
+            obj << v.docstring;
 
         for (const auto& item: v.children) {
             obj << item;
