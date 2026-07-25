@@ -1,11 +1,26 @@
 cmake_minimum_required(VERSION 3.16)
 project(libProfileParser CXX)
 
+include(FetchContent)
+FetchContent_Declare(
+    peglib
+    GIT_REPOSITORY https://github.com/yhirose/cpp-peglib
+    GIT_TAG 4b3bd64
+    GIT_SHALLOW TRUE
+)
+FetchContent_GetProperties(peglib)
+if(NOT peglib_POPULATED)
+    FetchContent_Populate(peglib)
+endif()
+
 add_library(libProfileParser STATIC)
 add_library(libProfileParser::libProfileParser ALIAS libProfileParser)
 
 target_include_directories(libProfileParser PUBLIC
     "${CMAKE_CURRENT_LIST_DIR}/include"
+    )
+target_include_directories(libProfileParser PRIVATE
+    "${peglib_SOURCE_DIR}"
     )
 
 set_target_properties(libProfileParser PROPERTIES
@@ -29,5 +44,4 @@ target_sources(libProfileParser PRIVATE
     "parser.hpp"
     "printers.cpp"
     "validation.cpp"
-    "peglib.h"  # Use FetchContent?
     )

@@ -1,0 +1,27 @@
+name: Quality checks
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install Ninja
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ninja-build
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - name: Sync dependencies
+        run: uv sync
+      - name: Lint
+        run: uv run ruff check .
+      - name: Test
+        run: uv run pytest

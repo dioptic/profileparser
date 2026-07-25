@@ -1,13 +1,13 @@
 [build-system]
-requires = ["scikit-build-core >=0.9", "typing_extensions; python_version < '3.11'"]
+requires = ["scikit-build-core>=0.11", "nanobind"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "dioptic.profileparser"
-version = "0.3.2"
+version = "0.3.3"
 description = "Parser library for ARGOS declarative profiles"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 authors = [
     { name = "Peter Würtz", email = "pwuertz@gmail.com" },
 ]
@@ -20,5 +20,37 @@ Homepage = "https://github.com/dioptic/profileparser"
 
 [tool.scikit-build]
 cmake.source-dir = "./python"
+cmake.version = "CMakeLists.txt"
+cmake.args = ["--preset", "default"]
 build-dir = "build/{wheel_tag}"
 wheel.py-api = "cp312"
+editable.rebuild = true
+
+[tool.uv]
+no-build-isolation-package = ["dioptic.profileparser"]
+
+[dependency-groups]
+dev = [
+    "nanobind",
+    "pytest",
+    "ruff",
+    "scikit-build-core>=0.11",
+    "ty",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.cibuildwheel]
+build = "cp312-manylinux_x86_64"
+archs = ["x86_64"]
+build-frontend = "build"
+test-requires = ["pytest"]
+test-command = "pytest {project}/tests"
+
+[tool.cibuildwheel.linux]
+manylinux-x86_64-image = "manylinux_2_34"
+environment = { CMAKE_GENERATOR = "Ninja" }

@@ -15,9 +15,6 @@
 
 namespace py = nanobind;
 using namespace nanobind::literals;
-using namespace std::string_view_literals;
-
-constexpr auto VERSION = "0.3.2"sv;
 
 struct PyProfile {
     PyProfile(std::string source)
@@ -86,8 +83,14 @@ private:
 };
 
 
-NB_MODULE(profileparser, m) {
-    m.attr("__version__") = py::str(VERSION.data(), VERSION.size());
+NB_MODULE(MODULE_NAME, m) {
+#define STRINGIFY(x) #x
+#define MACRO_STRINGIFY(x) STRINGIFY(x)
+#ifdef MODULE_VERSION
+    m.attr("__version__") = MACRO_STRINGIFY(MODULE_VERSION);
+#else
+    m.attr("__version__") = "dev";
+#endif
     
     py::class_<Profile::SourceInfo> PySourceInfo(m, "SourceInfo");
     PySourceInfo.def_ro("offset", &Profile::SourceInfo::offset);

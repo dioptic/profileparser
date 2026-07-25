@@ -1,2 +1,2 @@
-from .profileparser import *
-from .profileparser import __version__
+from ._profileparser import *
+from ._profileparser import __version__ as __version__
